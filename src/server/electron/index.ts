@@ -788,11 +788,31 @@ const crashReporter = {
   },
 };
 
+function getCodexDesktopUserAgent(): string {
+  const globals = globalThis as typeof globalThis & {
+    __CODEX_SHIM_VALUES__?: { version?: string };
+  };
+  const version = globals.__CODEX_SHIM_VALUES__?.version?.trim() || "unknown";
+  const platformNames: Partial<Record<NodeJS.Platform, string>> = {
+    darwin: "Mac OS",
+    linux: "X11; Linux",
+    win32: "Windows NT 10.0",
+  };
+  return `Codex Desktop/${version} (${platformNames[process.platform] ?? process.platform}; ${process.arch})`;
+}
+
 const net = {
   async fetch(input: string | URL, init?: RequestInit): Promise<Response> {
     // log("net.fetch", [input, init]);
     if (typeof globalThis.fetch === "function") {
-      return globalThis.fetch(input as URL | RequestInfo, init);
+      const headers = new Headers(init?.headers);
+      if (!headers.has("User-Agent")) {
+        headers.set("User-Agent", getCodexDesktopUserAgent());
+      }
+      return globalThis.fetch(input as URL | RequestInfo, {
+        ...init,
+        headers,
+      });
     }
     return new Response("", { status: 204 });
   },
