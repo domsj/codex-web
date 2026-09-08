@@ -322,6 +322,27 @@ function isUnhandledAddWorkspaceRootOptionMessage(value: unknown): value is {
   );
 }
 
+function isPickWorkspaceRootOptionMessage(value: unknown): value is {
+  type: "electron-pick-workspace-root-option";
+} {
+  return (
+    isRecord(value) && value.type === "electron-pick-workspace-root-option"
+  );
+}
+
+async function handlePickWorkspaceRootOptionMessage(): Promise<void> {
+  const root = await openSelectWorkspaceRootDialog({
+    listDirectory: requestWorkspaceDirectoryEntries,
+  });
+  if (!root) {
+    return;
+  }
+
+  emitRendererEvent("codex_desktop:message-for-view", [
+    { type: "workspace-root-option-picked", root },
+  ]);
+}
+
 function isOpenInBrowserMessage(value: unknown): value is {
   type: "open-in-browser";
   url: string;
@@ -434,6 +455,10 @@ export const ipcRenderer = {
         return handleLocalFilePickerMessage(args[0]);
       }
 
+      if (isPickWorkspaceRootOptionMessage(args[0])) {
+        return handlePickWorkspaceRootOptionMessage();
+      }
+
       if (isUnhandledAddWorkspaceRootOptionMessage(args[0])) {
         return openSelectWorkspaceRootDialog({
           listDirectory: requestWorkspaceDirectoryEntries,
@@ -473,6 +498,20 @@ export const ipcRenderer = {
     return this.removeListener(channel, listener);
   },
   send(channel: string, ...args: unknown[]): void {
+    if (
+      channel === "codex_desktop:message-from-view" &&
+      args.length === 1 &&
+      isPickWorkspaceRootOptionMessage(args[0])
+    ) {
+      void handlePickWorkspaceRootOptionMessage().catch((error) => {
+        console.error(
+          "[electron-stub] failed to pick workspace root option",
+          error,
+        );
+      });
+      return;
+    }
+
     enqueueMessage({
       type: "ipc-renderer-send",
       channel,
