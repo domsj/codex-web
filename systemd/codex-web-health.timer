@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically verify Codex Web end to end
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15s
+Persistent=true
+Unit=codex-web-health.service
+
+[Install]
+WantedBy=timers.target

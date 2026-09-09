@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/codex-web"
+stamp_file="$runtime_dir/last-recovery"
+cooldown_seconds="${CODEX_WEB_RECOVERY_COOLDOWN_SECONDS:-180}"
+now="$(date +%s)"
+last=0
+
+mkdir -p "$runtime_dir"
+if [[ -r "$stamp_file" ]]; then
+  read -r last < "$stamp_file" || last=0
+fi
+
+if (( now - last < cooldown_seconds )); then
+  echo "Codex Web recovery suppressed by ${cooldown_seconds}s cooldown"
+  exit 0
+fi
+
+printf '%s\n' "$now" > "$stamp_file"
+echo "Restarting Codex Web and its persistent app-server after a failed health check"
+exec systemctl --user restart codex-app-server.service codex-web.service

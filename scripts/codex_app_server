@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+
+codex_bin="${CODEX_APP_SERVER_BIN:-$(command -v codex)}"
+resources_path="${CODEX_DESKTOP_RESOURCES_PATH:-$repo_root/scratch/ChatGPT.app/Contents/Resources}"
+plugin_root="$resources_path/plugins/openai-bundled/plugins/codex-app-tools"
+node_bin="${CODEX_MCP_NODE_PATH:-$(command -v node)}"
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/codex-web"
+app_tools_pipe="${CODEX_WEB_APP_TOOLS_PIPE_PATH:-$runtime_dir/app-tools.sock}"
+app_server_socket="${CODEX_UNIX_SOCKET:-$runtime_dir/app-server.sock}"
+
+for required_file in \
+  "$codex_bin" \
+  "$node_bin" \
+  "$plugin_root/server.mjs" \
+  "$plugin_root/scripts/launch_codex_app_tools_mcp"
+do
+  if [[ ! -e "$required_file" ]]; then
+    echo "codex-web app-server prerequisite is missing: $required_file" >&2
+    exit 66
+  fi
+done
+
+mcp_config="mcp_servers.codex_app={\"command\"=\"$plugin_root/scripts/launch_codex_app_tools_mcp\",\"args\"=[\"./server.mjs\"],\"cwd\"=\"$plugin_root\",\"enabled\"=true,\"default_tools_approval_mode\"=\"approve\",\"tools\"={\"automation_update\"={\"approval_mode\"=\"prompt\"},\"create_thread\"={\"approval_mode\"=\"prompt\"},\"send_message_to_thread\"={\"approval_mode\"=\"prompt\"},\"fork_thread\"={\"approval_mode\"=\"prompt\"},\"handoff_thread\"={\"approval_mode\"=\"prompt\"}},\"startup_timeout_sec\"=10,\"tool_timeout_sec\"=3600,\"omit_tools_from\"=[\"deferred\"],\"env\"={\"CODEX_APP_TOOLS_PIPE_PATH\"=\"$app_tools_pipe\",\"CODEX_MCP_NODE_PATH\"=\"$node_bin\",\"CODEX_ELECTRON_RESOURCES_PATH\"=\"$resources_path\",\"CODEX_CLI_PATH\"=\"$codex_bin\"}}"
+
+if [[ "${1:-}" == "--check-config" ]]; then
+  exec "$codex_bin" \
+    -c "$mcp_config" \
+    -c 'mcp_servers.codex_app.enabled_tools=["read_thread"]' \
+    mcp list
+fi
+
+if (( $# > 0 )); then
+  echo "usage: $0 [--check-config]" >&2
+  exit 64
+fi
+
+mkdir -p "$runtime_dir"
+exec "$codex_bin" \
+  -c "$mcp_config" \
+  app-server --listen "unix://$app_server_socket"

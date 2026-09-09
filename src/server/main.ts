@@ -377,9 +377,13 @@ function ensureElectronLikeProcessContext(): void {
         }).trim()
       : os.release();
   processWithElectronFields.getSystemVersion ??= () => systemVersion;
+  // The desktop bundle is extracted from app.asar, but Electron's
+  // process.resourcesPath points at the directory containing app.asar. Several
+  // desktop services resolve bundled plugins (including codex-app-tools) from
+  // that parent Resources directory.
   processWithElectronFields.resourcesPath ??= path.resolve(
     __dirname,
-    "../../scratch/asar",
+    "../../scratch/ChatGPT.app/Contents/Resources",
   );
   processWithElectronFields.type ??= "browser";
 }

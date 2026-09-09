@@ -1,0 +1,30 @@
+[Unit]
+Description=Tailnet-only Codex browser UI
+Requires=codex-app-server.service
+After=codex-app-server.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/codex-web-app
+RuntimeDirectory=codex-web
+RuntimeDirectoryMode=0700
+CacheDirectory=codex-web
+CacheDirectoryMode=0700
+Environment=CODEX_UNIX_SOCKET=%t/codex-web/app-server.sock
+Environment=CODEX_CLI_PATH=%h/.local/bin/codex-web-app-server-proxy
+Environment=CODEX_WEB_APP_TOOLS_PIPE_PATH=%t/codex-web/app-tools.sock
+Environment=CODEX_WEB_STUB_DEBUG=0
+Environment=TMPDIR=%C/codex-web/tmp
+Environment=PATH=%h/.local/share/mise/installs/node/22/bin:%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStartPre=/usr/bin/install -d -m 0700 %C/codex-web/tmp
+ExecStart=%h/.local/share/mise/installs/node/22/bin/node %h/.local/share/codex-web-app/src/server/main.js --host 127.0.0.1 --port 8214
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,26 @@
+[Unit]
+Description=Persistent Codex app server for Codex Web
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+RuntimeDirectory=codex-web
+RuntimeDirectoryMode=0700
+Environment=CODEX_APP_SERVER_BIN=%h/.local/share/mise/installs/codex/0.153.4/bin/codex
+Environment=CODEX_MCP_NODE_PATH=%h/.local/share/mise/installs/node/22/bin/node
+Environment=CODEX_DESKTOP_RESOURCES_PATH=%h/.local/share/codex-web-app/scratch/ChatGPT.app/Contents/Resources
+Environment=CODEX_WEB_APP_TOOLS_PIPE_PATH=%t/codex-web/app-tools.sock
+Environment=CODEX_UNIX_SOCKET=%t/codex-web/app-server.sock
+ExecStartPre=/usr/bin/rm -f %t/codex-web/app-server.sock
+ExecStart=%h/.local/share/codex-web-app/scripts/codex_app_server
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=500
+
+[Install]
+WantedBy=default.target

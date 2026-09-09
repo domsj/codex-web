@@ -1,0 +1,6 @@
+--- a/.vite/build/main-C5K7o1Hr.js
++++ b/.vite/build/main-C5K7o1Hr.js
+@@ -153465,2 +153465,3 @@
+   let Ne = await mie({
++    pipePath: process.env.CODEX_WEB_APP_TOOLS_PIPE_PATH,
+     callTool: (e, t) => Fe.getWindowContext().callDynamicAppTool(e, t),

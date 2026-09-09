@@ -79,6 +79,37 @@ nix shell github:0xcaff/codex-web github:0xcaff/codex-web#codex_remote_proxy -c 
 program to use; when run directly in a terminal it will wait for protocol input
 rather than opening an interactive prompt.
 
+### long-running systemd service
+
+The files in [`systemd/`](systemd/) run the browser bridge and app-server as
+separate user services. The app-server is pinned to a specific CLI, receives a
+complete `codex_app` MCP definition, and survives browser-bridge restarts. A
+timer performs an HTTP check, an app-server handshake, a task-list request, and
+an ephemeral task-start configuration check. Failed checks restart the stack
+with a cooldown.
+
+Install the units and the user tmpfiles policy, then enable the services:
+
+```bash
+install -Dm644 systemd/codex-app-server.service ~/.config/systemd/user/codex-app-server.service
+install -Dm644 systemd/codex-web.service ~/.config/systemd/user/codex-web.service
+install -Dm644 systemd/codex-web-health.service ~/.config/systemd/user/codex-web-health.service
+install -Dm644 systemd/codex-web-health.timer ~/.config/systemd/user/codex-web-health.timer
+install -Dm644 systemd/codex-web-recover.service ~/.config/systemd/user/codex-web-recover.service
+install -Dm644 systemd/codex-web-tmpfiles.conf ~/.config/user-tmpfiles.d/codex-web.conf
+systemctl --user daemon-reload
+systemctl --user enable --now codex-app-server.service codex-web.service codex-web-health.timer
+```
+
+Review the pinned Codex and Node paths in the units before installing them on a
+different host. Run `systemctl --user start codex-web-health.service` for an
+immediate end-to-end check.
+
+For a persistent macOS SSH forward, copy
+[`contrib/macos/com.codex-web-tunnel.plist`](contrib/macos/com.codex-web-tunnel.plist)
+to `~/Library/LaunchAgents/`, adjust the destination if needed, and load it with
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.codex-web-tunnel.plist`.
+
 ## security
 
 run `codex-web` only on trusted networks. treat anyone who can reach the

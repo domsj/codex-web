@@ -1,0 +1,9 @@
+[Unit]
+Description=Recover Codex Web after a failed functional health check
+After=codex-web-health.service
+
+[Service]
+Type=oneshot
+Environment=CODEX_WEB_RECOVERY_COOLDOWN_SECONDS=180
+ExecStart=%h/.local/share/codex-web-app/scripts/codex_web_recover
+TimeoutStartSec=60
