@@ -4,10 +4,24 @@ set -euo pipefail
 runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/codex-web"
 stamp_file="$runtime_dir/last-recovery"
 cooldown_seconds="${CODEX_WEB_RECOVERY_COOLDOWN_SECONDS:-180}"
+web_url="${CODEX_WEB_HEALTH_URL:-http://127.0.0.1:8214/}"
+curl_bin="${CODEX_WEB_CURL_BIN:-/usr/bin/curl}"
+systemctl_bin="${CODEX_WEB_SYSTEMCTL_BIN:-/usr/bin/systemctl}"
 now="$(date +%s)"
 last=0
 
 mkdir -p "$runtime_dir"
+
+# A healthy HTTP endpoint plus a failed end-to-end check means the persistent
+# app-server is unhealthy. Restarting it here would terminate every active
+# turn, and a restart cannot repair a bad static configuration. Let the app-
+# server unit's own Restart= policy handle an actual process exit and leave
+# application-level failures visible for an operator.
+if "$curl_bin" --fail --silent --show-error --max-time 5 "$web_url" >/dev/null; then
+  echo "Codex Web backend health failed while HTTP is responsive; refusing to restart the persistent app-server"
+  exit 0
+fi
+
 if [[ -r "$stamp_file" ]]; then
   read -r last < "$stamp_file" || last=0
 fi
@@ -18,5 +32,5 @@ if (( now - last < cooldown_seconds )); then
 fi
 
 printf '%s\n' "$now" > "$stamp_file"
-echo "Restarting Codex Web and its persistent app-server after a failed health check"
-exec systemctl --user restart codex-app-server.service codex-web.service
+echo "Restarting only the Codex Web browser bridge after its HTTP endpoint failed"
+exec "$systemctl_bin" --user restart codex-web.service

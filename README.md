@@ -84,9 +84,12 @@ rather than opening an interactive prompt.
 The files in [`systemd/`](systemd/) run the browser bridge and app-server as
 separate user services. The app-server is pinned to a specific CLI, receives a
 complete `codex_app` MCP definition, and survives browser-bridge restarts. A
-timer performs an HTTP check, an app-server handshake, a task-list request, and
-an ephemeral task-start configuration check. Failed checks restart the stack
-with a cooldown.
+timer performs an HTTP check, an app-server handshake, and a task-list request.
+If the HTTP endpoint fails, recovery restarts only the browser bridge with a
+cooldown; it never automatically restarts the persistent
+app-server or interrupts active tasks. Backend failures remain visible for an
+operator, while an app-server process crash is handled by its own systemd
+restart policy.
 
 Install the units and the user tmpfiles policy, then enable the services:
 
@@ -103,7 +106,19 @@ systemctl --user enable --now codex-app-server.service codex-web.service codex-w
 
 Review the pinned Codex and Node paths in the units before installing them on a
 different host. Run `systemctl --user start codex-web-health.service` for an
-immediate end-to-end check.
+immediate non-mutating runtime check. Before deploying a changed bundle or
+configuration, run both `scripts/codex_app_server --check-config` and
+`node scripts/codex_web_health.mjs --deep`; the deep check creates one ephemeral
+task to verify the per-task MCP override path.
+
+Never restart `codex-app-server.service` directly during routine recovery or
+deployment. First run `node scripts/codex_web_maintenance.mjs`; it exits with
+status 75 and lists the task IDs if the persistent backend has active turns.
+When the check is clear,
+`node scripts/codex_web_maintenance.mjs --restart-backend` repeats the guard and
+then restarts the backend and browser bridge. Restarting only
+`codex-web.service` is safe for running tasks because their app-server remains
+alive.
 
 For a persistent macOS SSH forward, copy
 [`contrib/macos/com.codex-web-tunnel.plist`](contrib/macos/com.codex-web-tunnel.plist)

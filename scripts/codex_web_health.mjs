@@ -2,6 +2,7 @@
 
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 
 const webUrl = process.env.CODEX_WEB_HEALTH_URL ?? "http://127.0.0.1:8214/";
 const runtimeDir =
@@ -12,17 +13,40 @@ const proxyPath =
   process.env.CODEX_WEB_PROXY_PATH ??
   new URL("./codex_remote_proxy", import.meta.url).pathname;
 const timeoutMs = Number(process.env.CODEX_WEB_HEALTH_TIMEOUT_MS ?? "8000");
+const deepCheck = process.argv.slice(2).includes("--deep");
+
+for (const argument of process.argv.slice(2)) {
+  if (argument !== "--deep") {
+    throw new Error(`usage: ${process.argv[1]} [--deep]`);
+  }
+}
 
 function fail(message) {
   throw new Error(message);
 }
 
 async function checkHttp() {
-  const response = await fetch(webUrl, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) {
-    fail(`Codex Web returned HTTP ${response.status}`);
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const response = await fetch(webUrl, {
+        signal: AbortSignal.timeout(Math.min(2000, remainingMs)),
+      });
+      if (!response.ok) {
+        fail(`Codex Web returned HTTP ${response.status}`);
+      }
+      await response.body?.cancel();
+      return;
+    } catch (error) {
+      lastError = error;
+      await delay(250);
+    }
   }
-  await response.body?.cancel();
+  throw new Error(`Codex Web did not become ready within ${timeoutMs}ms`, {
+    cause: lastError,
+  });
 }
 
 async function checkSocket() {
@@ -42,7 +66,7 @@ async function checkAppServer() {
     let stderr = "";
     let initialized = false;
     let listHealthy = false;
-    let configHealthy = false;
+    let configHealthy = !deepCheck;
     let settled = false;
 
     const finish = (error) => {
@@ -67,18 +91,20 @@ async function checkAppServer() {
         child.stdin.write(
           `${JSON.stringify({ id: "health-list", method: "thread/list", params: { limit: 1 } })}\n`,
         );
-        child.stdin.write(
-          `${JSON.stringify({
-            id: "health-config",
-            method: "thread/start",
-            params: {
-              ephemeral: true,
-              config: {
-                "mcp_servers.codex_app.enabled_tools": ["read_thread"],
+        if (deepCheck) {
+          child.stdin.write(
+            `${JSON.stringify({
+              id: "health-config",
+              method: "thread/start",
+              params: {
+                ephemeral: true,
+                config: {
+                  "mcp_servers.codex_app.enabled_tools": ["read_thread"],
+                },
               },
-            },
-          })}\n`,
-        );
+            })}\n`,
+          );
+        }
         return;
       }
 
@@ -158,4 +184,4 @@ async function checkAppServer() {
 await checkHttp();
 await checkSocket();
 await checkAppServer();
-console.log("Codex Web health check passed");
+console.log(`Codex Web ${deepCheck ? "deep " : ""}health check passed`);

@@ -12,6 +12,6 @@ Environment=CODEX_WEB_APP_TOOLS_PIPE_PATH=%t/codex-web/app-tools.sock
 Environment=CODEX_UNIX_SOCKET=%t/codex-web/app-server.sock
 Environment=CODEX_WEB_HEALTH_URL=http://127.0.0.1:8214/
 Environment=CODEX_WEB_PROXY_PATH=%h/.local/bin/codex-web-app-server-proxy
-ExecStart=%h/.local/share/codex-web-app/scripts/codex_app_server --check-config
+Environment=CODEX_WEB_HEALTH_TIMEOUT_MS=15000
 ExecStart=%h/.local/share/mise/installs/node/22/bin/node %h/.local/share/codex-web-app/scripts/codex_web_health.mjs
 TimeoutStartSec=30

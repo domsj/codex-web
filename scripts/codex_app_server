@@ -27,10 +27,11 @@ done
 mcp_config="mcp_servers.codex_app={\"command\"=\"$plugin_root/scripts/launch_codex_app_tools_mcp\",\"args\"=[\"./server.mjs\"],\"cwd\"=\"$plugin_root\",\"enabled\"=true,\"default_tools_approval_mode\"=\"approve\",\"tools\"={\"automation_update\"={\"approval_mode\"=\"prompt\"},\"create_thread\"={\"approval_mode\"=\"prompt\"},\"send_message_to_thread\"={\"approval_mode\"=\"prompt\"},\"fork_thread\"={\"approval_mode\"=\"prompt\"},\"handoff_thread\"={\"approval_mode\"=\"prompt\"}},\"startup_timeout_sec\"=10,\"tool_timeout_sec\"=3600,\"omit_tools_from\"=[\"deferred\"],\"env\"={\"CODEX_APP_TOOLS_PIPE_PATH\"=\"$app_tools_pipe\",\"CODEX_MCP_NODE_PATH\"=\"$node_bin\",\"CODEX_ELECTRON_RESOURCES_PATH\"=\"$resources_path\",\"CODEX_CLI_PATH\"=\"$codex_bin\"}}"
 
 if [[ "${1:-}" == "--check-config" ]]; then
-  exec "$codex_bin" \
+  "$codex_bin" \
     -c "$mcp_config" \
     -c 'mcp_servers.codex_app.enabled_tools=["read_thread"]' \
-    mcp list
+    mcp list >/dev/null
+  exit 0
 fi
 
 if (( $# > 0 )); then
